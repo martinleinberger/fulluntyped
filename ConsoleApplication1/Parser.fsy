@@ -1,0 +1,53 @@
+﻿%{
+open AST
+%}
+
+// The start token becomes a parser function in the compiled code:
+%start start
+
+// Regular tokens
+%token <string> VARIABLE
+%token TRUE
+%token FALSE
+
+%token IF
+%token THEN
+%token ELSE
+
+%token LAMBDA
+%token DOT
+%token LPARENS
+%token RPARENS
+
+// Misc tokens
+%token EOF
+
+// This is the type of the data produced by a successful reduction of the 'start'
+// symbol:
+%type < AST.Toplevel > start
+
+%%
+
+// These are the rules of the grammar along with the F# code of the 
+// actions executed as rules are reduced.  
+start: File EOF { $1 }
+
+
+
+File:
+	Term { $1 }
+
+Term:
+	| Constant { $1 }
+	| LPARENS Term RPARENS	{ $2 }
+	| VARIABLE	{ fun ctx -> TmVar (name2Index ctx $1) }
+	| IF Term THEN Term ELSE Term { fun ctx -> TmIf ($2 ctx, $4 ctx, $6 ctx)}
+	| LAMBDA VARIABLE DOT Term 
+		{ fun ctx -> 
+            let ctx' = addName ctx $2
+            TmAbs ($2, $4 ctx') }
+	| Term Term { fun ctx -> TmApp ($1 ctx,$2 ctx) }
+
+Constant:
+	| TRUE { fun ctx -> TmTrue }
+	| FALSE { fun ctx -> TmFalse }

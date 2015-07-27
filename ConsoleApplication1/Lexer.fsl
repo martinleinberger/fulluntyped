@@ -1,0 +1,33 @@
+﻿{
+
+module Lexer
+
+// Opens methods related to fslex.exe
+open Microsoft.FSharp.Text.Lexing
+
+let newline (lexbuf: LexBuffer<_>) = 
+  lexbuf.StartPos <- lexbuf.StartPos.NextLine
+}
+
+// Regular expressions
+let whitespace = [' ' '\t' ]
+let newline = ('\n' | '\r' '\n')
+
+let variable_name = ['a'-'z' '\'']+
+
+rule tokenize = parse
+| "true"	{ Parser.TRUE }
+| "false"	{ Parser.FALSE }
+| "if"	{ Parser.IF }
+| "then"	{ Parser.THEN }
+| "else"	{ Parser.ELSE }
+| "λ"	{ Parser.LAMBDA }
+| "."	{ Parser.DOT }
+| "("	{ Parser.LPARENS }
+| ")"	{ Parser.RPARENS }
+| variable_name { Parser.VARIABLE (LexBuffer<_>.LexemeString lexbuf) }
+//--------------------------------
+| whitespace	{ tokenize lexbuf }
+| newline	{ newline lexbuf; tokenize lexbuf }
+| _    		{ failwith ("ParseError" + LexBuffer<_>.LexemeString lexbuf) }
+| eof   	{ Parser.EOF }
