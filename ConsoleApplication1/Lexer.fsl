@@ -2,18 +2,30 @@
 
 module Lexer
 
+open System
 // Opens methods related to fslex.exe
 open Microsoft.FSharp.Text.Lexing
 
 let newline (lexbuf: LexBuffer<_>) = 
   lexbuf.StartPos <- lexbuf.StartPos.NextLine
+
+let stringBuffer = System.Text.StringBuilder (2048)
+
+let resetStr () : unit = stringBuffer.Clear () |> ignore
+let addStr (ch : char) = stringBuffer.Append ch |> ignore
+let getStr () = stringBuffer.ToString()
+
+let error s = failwith s
+
 }
+
+
 
 // Regular expressions
 let whitespace = [' ' '\t' ]
 let newline = ('\n' | '\r' '\n')
 
-let variable_name = ['a'-'z' '\'']+
+let identifier_name = ['a'-'z' '\'']+
 
 rule tokenize = parse
 | "true"	{ Parser.TRUE }
@@ -21,13 +33,25 @@ rule tokenize = parse
 | "if"	{ Parser.IF }
 | "then"	{ Parser.THEN }
 | "else"	{ Parser.ELSE }
+| "let" { Parser.LET }
+| "in"  { Parser.IN }
 | "λ"	{ Parser.LAMBDA }
 | "."	{ Parser.DOT }
+| ","   { Parser.COMMA }
+| "{"   { Parser.LCURLY }
+| "}"   { Parser.RCURLY }
 | "("	{ Parser.LPARENS }
 | ")"	{ Parser.RPARENS }
-| variable_name { Parser.VARIABLE (LexBuffer<_>.LexemeString lexbuf) }
+| "="   { Parser.EQ }
+| "\""  { resetStr(); string lexbuf }
+| identifier_name { Parser.IDENTIFIER (LexBuffer<_>.LexemeString lexbuf) }
 //--------------------------------
 | whitespace	{ tokenize lexbuf }
 | newline	{ newline lexbuf; tokenize lexbuf }
 | _    		{ failwith ("ParseError" + LexBuffer<_>.LexemeString lexbuf) }
 | eof   	{ Parser.EOF }
+and string = parse
+| '"'   { Parser.STRINGV (getStr()) }
+| '\n'  { addStr '\n'; string lexbuf }
+| eof   { error "String not terminated" }
+| _     { addStr (lexbuf.LexemeChar 0); string lexbuf}

@@ -2,52 +2,69 @@
 open AST
 %}
 
-// The start token becomes a parser function in the compiled code:
+// Start token:
 %start start
 
-// Regular tokens
-%token <string> VARIABLE
+%token <string> IDENTIFIER
 %token TRUE
 %token FALSE
+%token <string> STRINGV
 
 %token IF
 %token THEN
 %token ELSE
+%token LET
+%token IN
 
 %token LAMBDA
 %token DOT
+%token COMMA
+%token EQ
 %token LPARENS
 %token RPARENS
-
-// Misc tokens
+%token LCURLY
+%token RCURLY
 %token EOF
 
-// This is the type of the data produced by a successful reduction of the 'start'
-// symbol:
+// Data produced by successfull reduction of start symbol: 
 %type < AST.Toplevel > start
 
 %%
 
-// These are the rules of the grammar along with the F# code of the 
-// actions executed as rules are reduced.  
+
 start: File EOF { $1 }
 
 
 
 File:
-	Term { $1 }
+    Term { $1 }
 
 Term:
 	| Constant { $1 }
 	| LPARENS Term RPARENS	{ $2 }
-	| VARIABLE	{ fun ctx -> TmVar (name2Index ctx $1) }
-	| IF Term THEN Term ELSE Term { fun ctx -> TmIf ($2 ctx, $4 ctx, $6 ctx)}
-	| LAMBDA VARIABLE DOT Term 
+	| IDENTIFIER    { fun ctx -> TmVar (name2Index ctx $1) }
+	| IF Term THEN Term ELSE Term 
+        { fun ctx ->
+            TmIf ($2 ctx, $4 ctx, $6 ctx) }
+    | LET IDENTIFIER EQ Term IN Term
+        { fun ctx -> 
+            let ctx' = addName ctx $2
+            TmLet ($2, $4 ctx, $6 ctx') }
+    | LCURLY RecordFields RCURLY { fun ctx -> TmRecord($2 ctx) }
+	| LAMBDA IDENTIFIER DOT Term 
 		{ fun ctx -> 
             let ctx' = addName ctx $2
             TmAbs ($2, $4 ctx') }
-	| Term Term { fun ctx -> TmApp ($1 ctx,$2 ctx) }
+	| Term Term { fun ctx -> TmApp ($1 ctx, $2 ctx) }
 
 Constant:
 	| TRUE { fun ctx -> TmTrue }
 	| FALSE { fun ctx -> TmFalse }
+    | STRINGV { fun ctx -> TmString $1 } 
+    
+RecordFields:
+    Field   { fun ctx -> [$1 ctx] }
+    | Field COMMA RecordFields    { fun ctx -> ($1 ctx) :: ($3 ctx) }
+
+Field:
+    IDENTIFIER EQ Term  { fun ctx -> ($1, $3 ctx) }
